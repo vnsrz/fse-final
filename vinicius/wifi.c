@@ -9,13 +9,14 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "sdkconfig.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-#define WIFI_SSID "Vinicius 2,4GHz"
-#define WIFI_PASS "12131721"
-#define WIFI_MAXIMUM_RETRY 5
+#define WIFI_SSID           CONFIG_SSID
+#define WIFI_PASS           CONFIG_PASSWORD
+#define WIFI_MAXIMUM_RETRY  5
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
