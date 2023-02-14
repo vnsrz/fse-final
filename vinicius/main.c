@@ -70,6 +70,10 @@ void trataComunicacaoComServidor(void * params){
 
             sprintf(mensagem, "{\"led_vermelho\": \"%d\"}", gpio_get_level(LED_2));
             mqtt_envia_mensagem("v1/devices/me/attributes", mensagem);
+            
+            sprintf(mensagem, "{\"led_verde\": \"%d\"}", gpio_get_level(LED_3));
+            mqtt_envia_mensagem("v1/devices/me/attributes", mensagem);
+
             vTaskDelay(3000 / portTICK_PERIOD_MS);
         }
     }
@@ -92,8 +96,11 @@ void app_main(void){
     adc_init(ADC_UNIT_1);
 
     pinMode(TEMP_PIN, GPIO_ANALOG);
-    pinMode(LED_2, GPIO_OUTPUT);
+    pinMode(LED_2, GPIO_INPUT_OUTPUT);
+    pinMode(LED_3, GPIO_INPUT_OUTPUT);
 
+    alterna_leds();
+    
     // Inicializa o NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -105,7 +112,6 @@ void app_main(void){
     conexaoWifiSemaphore = xSemaphoreCreateBinary();
     conexaoMQTTSemaphore = xSemaphoreCreateBinary();
     wifi_start();
-    alterna_leds();
     xTaskCreate(&conectadoWifi,  "Conexão ao MQTT", 4096, NULL, 1, NULL);
     xTaskCreate(&trataComunicacaoComServidor, "Comunicação com Broker", 4096, NULL, 1, NULL);
 
