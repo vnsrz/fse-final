@@ -9,13 +9,12 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "sdkconfig.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-#define WIFI_SSID           CONFIG_SSID
-#define WIFI_PASS           CONFIG_PASSWORD
+#define WIFI_SSID           "lappis"//CONFIG_ESP_WIFI_SSID
+#define WIFI_PASS           "<%=lappiscontainer=%>"//CONFIG_ESP_WIFI_PASSWORD
 #define WIFI_MAXIMUM_RETRY  5
 
 #define WIFI_CONNECTED_BIT BIT0

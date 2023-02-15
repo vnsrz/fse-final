@@ -7,99 +7,140 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "freertos/semphr.h"
-
-#include "wifi.h"
-#include "mqtt.h"
-#include "leds.h"
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_adc/adc_oneshot.h"
 
-#include "gpio_setup.h"
-#include "adc_module.h"
+#include "WIFI/wifi.h"
+#include "MQTT/mqtt.h"
+#include "leds.h"
+#include "DHT11/dht11.h"
+#include "GPIO/gpio_setup.h"
 
 SemaphoreHandle_t conexaoWifiSemaphore;
 SemaphoreHandle_t conexaoMQTTSemaphore;
 
-#define LED_1 2
-#define LED_2 4     // vermelho
-#define LED_3 16    // verde
+#define LED_PLACA 2
+#define LED_VERMELHO 4     
+#define LED_VERDE 16    
 #define BOTAO 0
+#define DHT_GPIO 18
 
-#define ADC_VREF_mV    3300.0 // in millivolt
-#define ADC_RESOLUTION 4096.0
-#define TEMP_PIN       ADC_CHANNEL_3
+float temperatura = 0, totalTemp = 0;
+float umidade = 0, totalUmid = 0;
+int status, counter = 1;
 
-void conectadoWifi(void * params)
-{
-  while(true)
-  {
-    if(xSemaphoreTake(conexaoWifiSemaphore, portMAX_DELAY))
-    {
-      // Processamento Internet
-      mqtt_start();
+void conectadoWifi(void * params){
+    while(true){
+        if(xSemaphoreTake(conexaoWifiSemaphore, portMAX_DELAY)){
+            mqtt_start();
+        }
     }
-  }
 }
 
 void trataComunicacaoComServidor(void * params){
     char mensagem[50];
     if(xSemaphoreTake(conexaoMQTTSemaphore, portMAX_DELAY)){
         while(true){
-            // int Vo;
-            // float R1 = 10000; // value of R1 on board
-            // float logR2, R2, T;
-            // float c1 = 0.001129148, c2 = 0.000234125, c3 = 0.0000000876741; //steinhart-hart coeficients for thermistor
+            int led_verm = 1;
+            int led_verd = 0;
 
-            // Vo = analogRead(TEMP_PIN);
-            // R2 = R1 * (1023.0 / (float)Vo - 1.0); //calculate resistance on thermistor
-            // logR2 = log(R2);
-            // T = (1.0 / (c1 + c2*logR2 + c3*logR2*logR2*logR2));
-
-            //int adcVal = analogRead(TEMP_PIN);
-            //float milliVolt = adcVal * (ADC_VREF_mV / ADC_RESOLUTION); // convert the ADC value to voltage in millivolt
-            //float tempC = milliVolt / 10;
-
-            // printf("Temperature: %.2f", T);
-            // printf(" °C\n");
-
-            float T = 20.0 + (float)rand()/(float)(RAND_MAX/10.0);
-            sprintf(mensagem, "{\"temperatura\": \"%f\"}", T);
-            mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
-
-            sprintf(mensagem, "{\"led_vermelho\": \"%d\"}", gpio_get_level(LED_2));
-            mqtt_envia_mensagem("v1/devices/me/attributes", mensagem);
-            
-            sprintf(mensagem, "{\"led_verde\": \"%d\"}", gpio_get_level(LED_3));
+            sprintf(mensagem, "{ \"led_vermelho\": \"%d\", \"led_verde\": \"%d\" }", led_verm, led_verd);
             mqtt_envia_mensagem("v1/devices/me/attributes", mensagem);
 
-            vTaskDelay(3000 / portTICK_PERIOD_MS);
+            if(status == 0 && temperatura != 0 && umidade != 0){
+                //ledPower = nvsGetValue("led");
+                sprintf(mensagem, "{ \"temperatura\": \"%.2f\", \"umidade\": \"%.2f\" }", temperatura, umidade);
+                mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
+            }
+
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
         }
     }
 }
 
 void alterna_leds(){
     config_leds();
-    brighten(LED_2);
-    // while(true)
-    // {
-    //     brighten(LED_2);
-    //     dimmer(LED_2);
 
-    //     brighten(LED_3);
-    //     dimmer(LED_3);
+    brighten(LED_VERMELHO);
+    // while(true){
+    //     dimmer(LED_VERMELHO);
+
+    //     brighten(LED_VERDE);
+    //     dimmer(LED_VERDE);
     // }
 }
 
+void trataDht(void *params){
+    float temp;
+    float umid;
+    while(true) {
+        temp = DHT11_read().temperature;
+        status = DHT11_read().status;
+        umid = DHT11_read().humidity;
+        if(temp > 1 && umid > 1){
+            totalTemp += temp;
+            totalUmid += umid;
+            temperatura = totalTemp/counter;
+            umidade = totalUmid/counter;
+            printf("Temperature is %.2f \n", temperatura);
+            printf("Humidity is %.2f\n", umidade);
+            printf("Status code is %d\n", status);
+            vTaskDelay(10000 / portTICK_PERIOD_MS);
+            counter++;
+        }else{
+            status = -1;
+        }
+    }
+}
+
+void setupGPIO(){
+    DHT11_init(DHT_GPIO);
+  
+    esp_rom_gpio_pad_select_gpio(BOTAO);
+    gpio_set_direction(BOTAO, GPIO_MODE_INPUT);
+
+    esp_rom_gpio_pad_select_gpio(LED_PLACA);
+    gpio_set_direction(LED_PLACA, GPIO_MODE_OUTPUT);
+
+    esp_rom_gpio_pad_select_gpio(LED_VERDE);
+    gpio_set_direction(LED_VERDE, GPIO_MODE_OUTPUT);
+
+    esp_rom_gpio_pad_select_gpio(LED_VERMELHO);
+    gpio_set_direction(LED_VERMELHO, GPIO_MODE_OUTPUT);
+}
+
+// void comunicaTemperaturaUmidade(void *params)
+// {
+//     char mensagem[50];
+//     char tag[] = "DHT";
+//     while (true)
+//     {
+//         xSemaphoreTake(conexaoMQTTSemaphore, portMAX_DELAY);
+//         struct dht11_reading leitura = DHT11_read();
+//         if (leitura.status == 0)
+//         {
+//             // DHT
+//             sprintf(mensagem, "{\"temperatura1\": \"%d\"}", leitura.temperature);
+//             mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
+//             ESP_LOGD(tag, "Temperatura enviada:%d", leitura.temperature);
+            
+//             sprintf(mensagem, "{\"umidade1\": \"%d\"}", leitura.humidity);
+//             mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
+//             ESP_LOGD(tag, "Umidade enviada:%d", leitura.humidity);
+//         }
+//         xSemaphoreGive(conexaoMQTTSemaphore);
+//         vTaskDelay(10000 / portTICK_PERIOD_MS);
+//     }
+    
+// }
+
 void app_main(void){
-    adc_init(ADC_UNIT_1);
+    // adc_init(ADC_UNIT_1);
 
-    pinMode(TEMP_PIN, GPIO_ANALOG);
-    pinMode(LED_2, GPIO_INPUT_OUTPUT);
-    pinMode(LED_3, GPIO_INPUT_OUTPUT);
-
-    alterna_leds();
+    //pinMode(TEMP_PIN, GPIO_ANALOG);
+    //pinMode(LED_2, GPIO_INPUT_OUTPUT);
+    //pinMode(LED_3, GPIO_INPUT_OUTPUT);
     
     // Inicializa o NVS
     esp_err_t ret = nvs_flash_init();
@@ -109,10 +150,16 @@ void app_main(void){
     }
     ESP_ERROR_CHECK(ret);
     
+    setupGPIO();
+    alterna_leds();
+
     conexaoWifiSemaphore = xSemaphoreCreateBinary();
     conexaoMQTTSemaphore = xSemaphoreCreateBinary();
+
     wifi_start();
+
     xTaskCreate(&conectadoWifi,  "Conexão ao MQTT", 4096, NULL, 1, NULL);
+    xTaskCreate(&trataDht, "Leitura DHT11", 4096, NULL, 1, NULL);
     xTaskCreate(&trataComunicacaoComServidor, "Comunicação com Broker", 4096, NULL, 1, NULL);
 
     // xTaskCreate(&alterna_leds, "Pisca leds", 4096, NULL, 1, NULL);
