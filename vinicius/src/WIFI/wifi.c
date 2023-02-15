@@ -13,8 +13,8 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-#define WIFI_SSID           "lappis"//CONFIG_ESP_WIFI_SSID
-#define WIFI_PASS           "<%=lappiscontainer=%>"//CONFIG_ESP_WIFI_PASSWORD
+#define WIFI_SSID           "Vinicius 2,4GHz"//"lappis"//CONFIG_ESP_WIFI_SSID
+#define WIFI_PASS           "12131721"//"<%=lappiscontainer=%>"//CONFIG_ESP_WIFI_PASSWORD
 #define WIFI_MAXIMUM_RETRY  5
 
 #define WIFI_CONNECTED_BIT BIT0

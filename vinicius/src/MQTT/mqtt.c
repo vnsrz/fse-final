@@ -5,6 +5,7 @@
 #include "esp_system.h"
 #include "esp_event.h"
 #include "esp_netif.h"
+#include "cJSON.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -25,6 +26,10 @@
 extern SemaphoreHandle_t conexaoMQTTSemaphore;
 esp_mqtt_client_handle_t client;
 
+extern int led_verd;
+extern int led_verm;
+extern int led_placa;
+
 static void log_error_if_nonzero(const char *message, int error_code)
 {
     if (error_code != 0) {
@@ -38,6 +43,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     esp_mqtt_event_handle_t event = event_data;
     esp_mqtt_client_handle_t client = event->client;
     int msg_id;
+
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
@@ -63,7 +69,23 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG, "MQTT_EVENT_DATA");
         printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
         printf("DATA=%.*s\r\n", event->data_len, event->data);
+
+        char *dados = event->data;
+        cJSON* json = cJSON_Parse(dados);
+        cJSON* method = cJSON_GetObjectItem(json, "method");
+        cJSON* params = cJSON_GetObjectItem(json, "params");
+        
+        if (!strcmp(method->valuestring, "setLED_verde")) {
+            led_verd = params->valueint;
+        }
+        else if (!strcmp(method->valuestring, "setLED_vermelho")) {
+            led_verm = params->valueint;
+        }
+        else if (!strcmp(method->valuestring, "setLED_placa")) {
+            led_placa = params->valueint;
+        }
         break;
+        // DATA={"method":"setLED_verde","params":122.78}
     case MQTT_EVENT_ERROR:
         ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
         if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
@@ -84,7 +106,7 @@ void mqtt_start()
 {
     esp_mqtt_client_config_t mqtt_config = {
         .broker.address.uri = "mqtt://164.41.98.25",
-        .credentials.username = "FhDUui0a5LUwCadjyUKJ",
+        .credentials.username = "uQJrAGhHIZc6Lgsi4oxr",
     };
     client = esp_mqtt_client_init(&mqtt_config);
     
